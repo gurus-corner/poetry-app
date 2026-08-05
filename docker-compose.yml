@@ -1,0 +1,44 @@
+
+services:
+  # 1. PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: poetry_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: poetry_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. FastAPI Backend
+  api:
+    build:
+      context: ./poetry-api
+      dockerfile: Dockerfile
+    container_name: poetry_api
+    restart: always
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@db:5432/poetry_db
+    depends_on:
+      - db
+
+  # 3. React Frontend
+  frontend:
+    build:
+      context: ./poetry-ui
+      dockerfile: Dockerfile
+    container_name: poetry_ui
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
