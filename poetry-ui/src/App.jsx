@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { BookOpen, Maximize2, Minimize2, Sun, Moon, Plus, X, Feathers } from 'lucide-react';
+import { BookOpen, Maximize2, Minimize2, Sun, Moon, Plus, X } from 'lucide-react';
 
-// Adjust to match your active Docker API port (8001 or 8000)
 const API_BASE = 'http://127.0.0.1:8001';
 
 export default function App() {
@@ -28,7 +27,7 @@ export default function App() {
     try {
       const res = await axios.get(`${API_BASE}/poems`);
       setPoems(res.data);
-      if (res.data.length > 0 && !selectedPoem) {
+      if (res.data.length > 0) {
         setSelectedPoem(res.data[0]);
       }
     } catch (err) {
@@ -50,19 +49,17 @@ export default function App() {
       };
 
       const res = await axios.post(`${API_BASE}/poems`, payload);
-      
-      // Reset form and close modal
+
       setNewTitle('');
       setNewExcerpt('');
       setNewContent('');
       setIsModalOpen(false);
 
-      // Refresh poems list and select new poem
       await fetchPoems();
       setSelectedPoem(res.data);
     } catch (err) {
       console.error('Error creating poem:', err);
-      alert('Failed to save poem. Make sure the API is running.');
+      alert('Failed to save poem. Check if API is reachable.');
     } finally {
       setIsSubmitting(false);
     }
@@ -81,14 +78,14 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 text-white text-sm font-medium px-3.5 py-1.5 rounded-md transition shadow-sm"
+              className="flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 text-white text-sm font-medium px-3.5 py-1.5 rounded-md transition shadow-sm cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               Write Poem
             </button>
             <button 
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className="p-2 rounded-full hover:bg-stone-200 dark:hover:bg-stone-800 transition"
+              className="p-2 rounded-full hover:bg-stone-200 dark:hover:bg-stone-800 transition cursor-pointer"
               title="Toggle Theme"
             >
               {isDarkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-stone-600" />}
@@ -99,7 +96,7 @@ export default function App() {
 
       <main className="max-w-5xl mx-auto px-6 py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
         
-        {/* Left Sidebar: Poem List */}
+        {/* Left Sidebar */}
         {!isFocusMode && (
           <aside className="md:col-span-1 space-y-4">
             <div className="flex justify-between items-center">
@@ -111,7 +108,7 @@ export default function App() {
                 <button
                   key={poem.id}
                   onClick={() => setSelectedPoem(poem)}
-                  className={`w-full text-left p-3 rounded-lg transition ${
+                  className={`w-full text-left p-3 rounded-lg transition cursor-pointer ${
                     selectedPoem?.id === poem.id
                       ? 'bg-amber-100 dark:bg-amber-950/40 border-l-4 border-amber-600 font-medium'
                       : 'hover:bg-stone-200/50 dark:hover:bg-stone-900'
@@ -125,29 +122,27 @@ export default function App() {
           </aside>
         )}
 
-        {/* Main Reading Canvas */}
+        {/* Main Canvas */}
         <section className={`${isFocusMode ? 'col-span-3 max-w-2xl mx-auto py-8' : 'md:col-span-2'}`}>
           {selectedPoem ? (
             <article className="space-y-8 bg-stone-100/50 dark:bg-stone-900/30 p-8 rounded-xl border border-stone-200/60 dark:border-stone-800/60 shadow-sm">
-              
-              {/* Controls Bar */}
               <div className="flex justify-between items-center border-b pb-4 border-stone-200 dark:border-stone-800">
                 <div className="flex gap-2 text-xs">
                   <button 
                     onClick={() => setFontSize('text-base')} 
-                    className={`px-2.5 py-1 rounded ${fontSize === 'text-base' ? 'bg-amber-700 text-white' : 'bg-stone-200 dark:bg-stone-800'}`}
+                    className={`px-2.5 py-1 rounded cursor-pointer ${fontSize === 'text-base' ? 'bg-amber-700 text-white' : 'bg-stone-200 dark:bg-stone-800'}`}
                   >
                     A
                   </button>
                   <button 
                     onClick={() => setFontSize('text-lg')} 
-                    className={`px-2.5 py-1 rounded ${fontSize === 'text-lg' ? 'bg-amber-700 text-white' : 'bg-stone-200 dark:bg-stone-800'}`}
+                    className={`px-2.5 py-1 rounded cursor-pointer ${fontSize === 'text-lg' ? 'bg-amber-700 text-white' : 'bg-stone-200 dark:bg-stone-800'}`}
                   >
                     A+
                   </button>
                   <button 
                     onClick={() => setFontSize('text-xl')} 
-                    className={`px-2.5 py-1 rounded ${fontSize === 'text-xl' ? 'bg-amber-700 text-white' : 'bg-stone-200 dark:bg-stone-800'}`}
+                    className={`px-2.5 py-1 rounded cursor-pointer ${fontSize === 'text-xl' ? 'bg-amber-700 text-white' : 'bg-stone-200 dark:bg-stone-800'}`}
                   >
                     A++
                   </button>
@@ -155,47 +150,45 @@ export default function App() {
 
                 <button 
                   onClick={() => setIsFocusMode(!isFocusMode)}
-                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-stone-300 dark:border-stone-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition"
+                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-stone-300 dark:border-stone-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition cursor-pointer"
                 >
                   {isFocusMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
                   {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
                 </button>
               </div>
 
-              {/* Poem Title */}
               <header className="space-y-1">
                 <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight">{selectedPoem.title}</h1>
                 <p className="text-xs text-stone-500">Views: {selectedPoem.views_count}</p>
               </header>
 
-              {/* Poem Content */}
               <div className={`font-serif leading-relaxed whitespace-pre-wrap ${fontSize} ${isDarkMode ? 'text-stone-200' : 'text-stone-800'}`}>
                 {selectedPoem.content}
               </div>
-
             </article>
           ) : (
             <div className="text-center py-20 text-stone-500">
               <p className="font-serif italic text-lg">No poem selected.</p>
-              <p className="text-xs mt-1">Click "Write Poem" to compose your first piece!</p>
+              <p className="text-xs mt-1">Click "Write Poem" above to compose your first piece!</p>
             </div>
           )}
         </section>
 
       </main>
 
-      {/* CREATE POEM MODAL */}
+      {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl max-w-xl w-full p-6 shadow-2xl relative space-y-4">
             
             <div className="flex justify-between items-center border-b pb-3 border-stone-200 dark:border-stone-800">
               <h3 className="font-serif text-xl font-bold flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-amber-700" />
                 Drafting Room
               </h3>
               <button 
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-md hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500"
+                className="p-1 rounded-md hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-500 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -251,14 +244,14 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 text-xs font-medium rounded hover:bg-stone-100 dark:hover:bg-stone-800"
+                    className="px-4 py-2 text-xs font-medium rounded hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="px-4 py-2 text-xs font-medium bg-amber-700 hover:bg-amber-800 text-white rounded transition shadow-sm disabled:opacity-50"
+                    className="px-4 py-2 text-xs font-medium bg-amber-700 hover:bg-amber-800 text-white rounded transition shadow-sm disabled:opacity-50 cursor-pointer"
                   >
                     {isSubmitting ? 'Saving...' : 'Publish Poem'}
                   </button>
