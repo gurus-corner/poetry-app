@@ -4,6 +4,11 @@ from uuid import UUID
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session
+from typing import List, Optional
+import models, schemas
+from database import engine, get_db
+import re
 
 from database import engine, Base, get_db
 import models
@@ -34,29 +39,40 @@ def slugify(text: str) -> str:
 def root():
     return {"message": "Welcome to the Poetry Platform API"}
 
+@app.get("/poems", response_model=List[schemas.PoemResponse])
+def get_poems(
+    mood: Optional[str] = None,
+    tag: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Poem)
+    
+    if mood and mood.lower() != "all":
+        query = query.filter(models.Poem.mood.ilike(f"%{mood}%"))
+        
+    if tag:
+        query = query.filter(models.Poem.tags.ilike(f"%{tag}%"))
+        
+    return query.order_by(models.Poem.created_at.desc()).all()
+
 
 @app.post("/poems", response_model=schemas.PoemResponse, status_code=status.HTTP_201_CREATED)
-def create_poem(poem_in: schemas.PoemCreate, db: Session = Depends(get_db)):
-    base_slug = slugify(poem_in.title)
-    slug = base_slug
+def create_poem(poem: schemas.PoemCreate, db: Session = Depends(get_db)):
+    slug = re.sub(r'[^\w\s-]', '', poem.title.lower()).replace(' ', '-')
     
-    # Simple slug collision check
-    existing = db.query(models.Poem).filter(models.Poem.slug == slug).first()
-    if existing:
-        import uuid
-        slug = f"{base_slug}-{str(uuid.uuid4())[:8]}"
-
-    poem = models.Poem(
-        title=poem_in.title,
+    db_poem = models.Poem(
+        title=poem.title,
         slug=slug,
-        content=poem_in.content,
-        excerpt=poem_in.excerpt,
-        status=poem_in.status,
+        content=poem.content,
+        excerpt=poem.excerpt,
+        status=poem.status,
+        mood=poem.mood,
+        tags=poem.tags
     )
-    db.add(poem)
+    db.add(db_poem)
     db.commit()
-    db.refresh(poem)
-    return poem
+    db.refresh(db_poem)
+    return db_poem
 
 
 @app.get("/poems", response_model=List[schemas.PoemResponse])
