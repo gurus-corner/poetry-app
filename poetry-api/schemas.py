@@ -7,6 +7,35 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
+from pydantic import BaseModel, EmailStr
+from typing import Optional
+from datetime import datetime
+
+# --- USER SCHEMAS ---
+class UserCreate(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
+
+class LoginRequest(BaseModel):
+    username_or_email: str
+    password: str
+
+# --- POEM SCHEMAS ---
 class PoemBase(BaseModel):
     title: str
     content: str
@@ -23,6 +52,7 @@ class PoemResponse(PoemBase):
     slug: str
     views_count: int
     created_at: datetime
+    author: Optional[UserResponse] = None
 
     class Config:
         from_attributes = True
