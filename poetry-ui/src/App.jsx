@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { BookOpen, Maximize2, Minimize2, Sun, Moon, Plus, X, Tag, Sparkles, User as UserIcon, LogOut, Lock } from 'lucide-react';
+import { BookOpen, Maximize2, Minimize2, Sun, Moon, Plus, X, Tag, Sparkles, User as UserIcon, LogOut, Lock, Heart, Eye, Pencil, Trash2 } from 'lucide-react';
 
 const API_BASE = 'http://127.0.0.1:8001';
 const MOODS = ['All', 'Melancholic', 'Hopeful', 'Reflective', 'Nature', 'Romantic', 'Cosmic'];
@@ -28,8 +28,9 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
 
-  // Write Modal State
+  // Write/Edit Modal State
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
+  const [editingPoemId, setEditingPoemId] = useState(null);
   const [newTitle, setNewTitle] = useState('');
   const [newExcerpt, setNewExcerpt] = useState('');
   const [newContent, setNewContent] = useState('');
@@ -49,13 +50,100 @@ export default function App() {
       
       const res = await axios.get(url);
       setPoems(res.data);
-      if (res.data.length > 0) {
-        setSelectedPoem(res.data[0]);
-      } else {
-        setSelectedPoem(null);
+      if (res.data.length > 0 && !selectedPoem) {
+        handleSelectPoem(res.data[0]);
       }
     } catch (err) {
       console.error('Error fetching poems:', err);
+    }
+  };
+
+  const handleSelectPoem = async (poem) => {
+    setSelectedPoem(poem);
+    try {
+      const res = await axios.post(`${API_BASE}/poems/${poem.id}/view`);
+      setSelectedPoem(res.data);
+      setPoems((prev) => prev.map((p) => (p.id === poem.id ? res.data : p)));
+    } catch (err) {
+      console.error('Error recording view:', err);
+    }
+  };
+
+  const handleLikePoem = async (poemId) => {
+    try {
+      const res = await axios.post(`${API_BASE}/poems/${poemId}/like`);
+      setSelectedPoem(res.data);
+      setPoems((prev) => prev.map((p) => (p.id === poemId ? res.data : p)));
+    } catch (err) {
+      console.error('Error liking poem:', err);
+    }
+  };
+
+  const handleOpenCreateModal = () => {
+    setEditingPoemId(null);
+    setNewTitle('');
+    setNewExcerpt('');
+    setNewContent('');
+    setNewMood('Reflective');
+    setNewTags('');
+    setIsWriteModalOpen(true);
+  };
+
+  const handleOpenEditModal = (poem) => {
+    setEditingPoemId(poem.id);
+    setNewTitle(poem.title || '');
+    setNewExcerpt(poem.excerpt || '');
+    setNewContent(poem.content || '');
+    setNewMood(poem.mood || 'Reflective');
+    setNewTags(poem.tags || '');
+    setIsWriteModalOpen(true);
+  };
+
+  const handleSavePoem = async (e) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newContent.trim()) return;
+
+    setIsSubmitting(true);
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const payload = {
+        title: newTitle,
+        excerpt: newExcerpt || null,
+        content: newContent,
+        mood: newMood,
+        tags: newTags || null,
+      };
+
+      let res;
+      if (editingPoemId) {
+        res = await axios.put(`${API_BASE}/poems/${editingPoemId}`, payload, { headers });
+      } else {
+        res = await axios.post(`${API_BASE}/poems`, payload, { headers });
+      }
+
+      setIsWriteModalOpen(false);
+      await fetchPoems(selectedMood);
+      setSelectedPoem(res.data);
+    } catch (err) {
+      console.error('Error saving poem:', err);
+      alert(err.response?.data?.detail || 'Failed to save poem.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeletePoem = async (poemId) => {
+    if (!window.confirm('Are you sure you want to delete this poem?')) return;
+
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      await axios.delete(`${API_BASE}/poems/${poemId}`, { headers });
+      
+      setSelectedPoem(null);
+      await fetchPoems(selectedMood);
+    } catch (err) {
+      console.error('Error deleting poem:', err);
+      alert(err.response?.data?.detail || 'Failed to delete poem.');
     }
   };
 
@@ -83,7 +171,14 @@ export default function App() {
       setAuthEmail('');
       setAuthPassword('');
     } catch (err) {
-      setAuthError(err.response?.data?.detail || 'Authentication failed');
+      const detail = err.response?.data?.detail;
+      if (typeof detail === 'string') {
+        setAuthError(detail);
+      } else if (Array.isArray(detail)) {
+        setAuthError(detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(', '));
+      } else {
+        setAuthError('Authentication failed');
+      }
     }
   };
 
@@ -94,38 +189,7 @@ export default function App() {
     localStorage.removeItem('poetry_user');
   };
 
-  const handleCreatePoem = async (e) => {
-    e.preventDefault();
-    if (!newTitle.trim() || !newContent.trim()) return;
-
-    setIsSubmitting(true);
-    try {
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const payload = {
-        title: newTitle,
-        excerpt: newExcerpt || null,
-        content: newContent,
-        mood: newMood,
-        tags: newTags || null,
-      };
-
-      const res = await axios.post(`${API_BASE}/poems`, payload, { headers });
-
-      setNewTitle('');
-      setNewExcerpt('');
-      setNewContent('');
-      setNewTags('');
-      setIsWriteModalOpen(false);
-
-      await fetchPoems(selectedMood);
-      setSelectedPoem(res.data);
-    } catch (err) {
-      console.error('Error creating poem:', err);
-      alert('Failed to save poem.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const isAuthor = user && selectedPoem && selectedPoem.author && selectedPoem.author.id === user.id;
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-stone-950 text-stone-100' : 'bg-stone-50 text-stone-900'}`}>
@@ -134,27 +198,27 @@ export default function App() {
       {!isFocusMode && (
         <header className="border-b border-stone-200 dark:border-stone-800 px-6 py-4 flex justify-between items-center max-w-5xl mx-auto">
           <div className="flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-amber-700" />
+            <BookOpen className="w-6 h-6 text-amber-700"/>
             <h1 className="text-xl font-serif font-bold tracking-tight">Verse & Canvas</h1>
           </div>
           <div className="flex items-center gap-3">
             {user ? (
               <div className="flex items-center gap-3">
                 <span className="text-xs font-medium text-stone-600 dark:text-stone-300 flex items-center gap-1">
-                  <UserIcon className="w-3.5 h-3.5 text-amber-700" /> {user.username}
+                  <UserIcon className="w-3.5 h-3.5 text-amber-700"/> {user.username}
                 </span>
                 <button
-                  onClick={() => setIsWriteModalOpen(true)}
+                  onClick={handleOpenCreateModal}
                   className="flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-medium px-3 py-1.5 rounded-md transition shadow-sm cursor-pointer"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Write
+                  <Plus className="w-3.5 h-3.5"/> Write
                 </button>
                 <button 
                   onClick={handleLogout}
                   className="p-1.5 text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 cursor-pointer"
                   title="Logout"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4 h-4"/>
                 </button>
               </div>
             ) : (
@@ -162,7 +226,7 @@ export default function App() {
                 onClick={() => { setAuthMode('login'); setIsAuthModalOpen(true); }}
                 className="flex items-center gap-1 bg-stone-900 dark:bg-stone-100 dark:text-stone-900 text-white text-xs font-medium px-3.5 py-1.5 rounded-md hover:bg-stone-800 transition cursor-pointer"
               >
-                <Lock className="w-3 h-3" /> Sign In
+                <Lock className="w-3 h-3"/> Sign In
               </button>
             )}
 
@@ -170,7 +234,7 @@ export default function App() {
               onClick={() => setIsDarkMode(!isDarkMode)}
               className="p-2 rounded-full hover:bg-stone-200 dark:hover:bg-stone-800 transition cursor-pointer"
             >
-              {isDarkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-stone-600" />}
+              {isDarkMode ? <Sun className="w-5 h-5 text-amber-400"/> : <Moon className="w-5 h-5 text-stone-600"/>}
             </button>
           </div>
         </header>
@@ -183,7 +247,7 @@ export default function App() {
           <aside className="md:col-span-1 space-y-6">
             <div className="space-y-2">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Filter by Mood
+                <Sparkles className="w-3.5 h-3.5 text-amber-600"/> Filter by Mood
               </h2>
               <div className="flex flex-wrap gap-1.5">
                 {MOODS.map((mood) => (
@@ -211,7 +275,7 @@ export default function App() {
                 {poems.map((poem) => (
                   <button
                     key={poem.id}
-                    onClick={() => setSelectedPoem(poem)}
+                    onClick={() => handleSelectPoem(poem)}
                     className={`w-full text-left p-3 rounded-lg transition cursor-pointer ${
                       selectedPoem?.id === poem.id
                         ? 'bg-amber-100 dark:bg-amber-950/40 border-l-4 border-amber-600 font-medium'
@@ -219,13 +283,12 @@ export default function App() {
                     }`}
                   >
                     <p className="font-serif text-sm">{poem.title}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      {poem.mood && (
-                        <span className="text-[10px] uppercase font-semibold text-amber-700 dark:text-amber-500 tracking-wider">
-                          {poem.mood}
-                        </span>
-                      )}
-                      {poem.author && <span className="text-[11px] text-stone-400 italic">by {poem.author.username}</span>}
+                    <div className="flex items-center justify-between mt-1 text-xs text-stone-500">
+                      {poem.author && <span className="italic">by {poem.author.username}</span>}
+                      <span className="flex items-center gap-2">
+                        <span className="flex items-center gap-0.5"><Eye className="w-3 h-3"/> {poem.views_count}</span>
+                        <span className="flex items-center gap-0.5"><Heart className="w-3 h-3 text-red-500"/> {poem.likes_count}</span>
+                      </span>
                     </div>
                   </button>
                 ))}
@@ -245,20 +308,57 @@ export default function App() {
                   <button onClick={() => setFontSize('text-xl')} className={`px-2.5 py-1 rounded cursor-pointer ${fontSize === 'text-xl' ? 'bg-amber-700 text-white' : 'bg-stone-200 dark:bg-stone-800'}`}>A++</button>
                 </div>
 
-                <button 
-                  onClick={() => setIsFocusMode(!isFocusMode)}
-                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-stone-300 dark:border-stone-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition cursor-pointer"
-                >
-                  {isFocusMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                  {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
-                </button>
+                <div className="flex items-center gap-3">
+                  {/* Author Edit & Delete Actions */}
+                  {isAuthor && (
+                    <div className="flex items-center gap-1.5 border-r pr-3 border-stone-300 dark:border-stone-700">
+                      <button
+                        onClick={() => handleOpenEditModal(selectedPoem)}
+                        className="p-1.5 rounded hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300 cursor-pointer"
+                        title="Edit Poem"
+                      >
+                        <Pencil className="w-4 h-4"/>
+                      </button>
+                      <button
+                        onClick={() => handleDeletePoem(selectedPoem.id)}
+                        className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 cursor-pointer"
+                        title="Delete Poem"
+                      >
+                        <Trash2 className="w-4 h-4"/>
+                      </button>
+                    </div>
+                  )}
+
+                  <button 
+                    onClick={() => handleLikePoem(selectedPoem.id)}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 transition cursor-pointer"
+                  >
+                    <Heart className="w-3.5 h-3.5 fill-red-500 text-red-500"/>
+                    <span>{selectedPoem.likes_count} Likes</span>
+                  </button>
+
+                  <button 
+                    onClick={() => setIsFocusMode(!isFocusMode)}
+                    className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-stone-300 dark:border-stone-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition cursor-pointer"
+                  >
+                    {isFocusMode ? <Minimize2 className="w-3.5 h-3.5"/> : <Maximize2 className="w-3.5 h-3.5"/>}
+                    {isFocusMode ? 'Exit Focus' : 'Focus Mode'}
+                  </button>
+                </div>
               </div>
 
               <header className="space-y-2">
-                <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight">{selectedPoem.title}</h1>
+                <div className="flex items-center justify-between">
+                  <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight">{selectedPoem.title}</h1>
+                  <span className="flex items-center gap-1 text-xs text-stone-400">
+                    <Eye className="w-4 h-4"/> {selectedPoem.views_count} views
+                  </span>
+                </div>
+
                 {selectedPoem.author && (
                   <p className="text-xs text-amber-700 dark:text-amber-500 font-medium">Written by {selectedPoem.author.username}</p>
                 )}
+                
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   {selectedPoem.mood && (
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-medium">
@@ -267,7 +367,7 @@ export default function App() {
                   )}
                   {selectedPoem.tags && selectedPoem.tags.split(',').map((tag, idx) => (
                     <span key={idx} className="text-xs flex items-center gap-1 text-stone-500 bg-stone-200/60 dark:bg-stone-800 px-2 py-0.5 rounded">
-                      <Tag className="w-3 h-3" /> {tag.trim()}
+                      <Tag className="w-3 h-3"/> {tag.trim()}
                     </span>
                   ))}
                 </div>
@@ -279,7 +379,7 @@ export default function App() {
             </article>
           ) : (
             <div className="text-center py-20 text-stone-500">
-              <p className="font-serif italic text-lg">No poems selected.</p>
+              <p className="font-serif italic text-lg">No poem selected.</p>
             </div>
           )}
         </section>
@@ -295,7 +395,7 @@ export default function App() {
                 {authMode === 'login' ? 'Sign In' : 'Create Account'}
               </h3>
               <button onClick={() => setIsAuthModalOpen(false)} className="text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 cursor-pointer">
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5"/>
               </button>
             </div>
 
@@ -359,20 +459,21 @@ export default function App() {
         </div>
       )}
 
-      {/* WRITE POEM MODAL */}
+      {/* WRITE / EDIT POEM MODAL */}
       {isWriteModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl max-w-xl w-full p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-center border-b pb-3 border-stone-200 dark:border-stone-800">
               <h3 className="font-serif text-xl font-bold flex items-center gap-2 text-stone-900 dark:text-stone-100">
-                <BookOpen className="w-5 h-5 text-amber-700" /> Drafting Room
+                <BookOpen className="w-5 h-5 text-amber-700"/> 
+                {editingPoemId ? 'Edit Verse' : 'Drafting Room'}
               </h3>
               <button onClick={() => setIsWriteModalOpen(false)} className="text-stone-500 hover:text-stone-800 dark:hover:text-stone-200 cursor-pointer">
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5"/>
               </button>
             </div>
 
-            <form onSubmit={handleCreatePoem} className="space-y-4">
+            <form onSubmit={handleSavePoem} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wider mb-1">Title</label>
@@ -425,7 +526,7 @@ export default function App() {
                   Cancel
                 </button>
                 <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-xs font-medium bg-amber-700 hover:bg-amber-800 text-white rounded transition shadow-sm cursor-pointer disabled:opacity-50">
-                  {isSubmitting ? 'Saving...' : 'Publish Poem'}
+                  {isSubmitting ? 'Saving...' : editingPoemId ? 'Update Poem' : 'Publish Poem'}
                 </button>
               </div>
             </form>

@@ -122,6 +122,28 @@ def get_poems(
         query = query.filter(models.Poem.tags.ilike(f"%{tag}%"))
     return query.order_by(models.Poem.created_at.desc()).all()
 
+@app.post("/poems/{poem_id}/view", response_model=schemas.PoemResponse)
+def increment_view_count(poem_id: int, db: Session = Depends(get_db)):
+    poem = db.query(models.Poem).filter(models.Poem.id == poem_id).first()
+    if not poem:
+        raise HTTPException(status_code=404, detail="Poem not found")
+    
+    poem.views_count += 1
+    db.commit()
+    db.refresh(poem)
+    return poem
+
+@app.post("/poems/{poem_id}/like", response_model=schemas.PoemResponse)
+def like_poem(poem_id: int, db: Session = Depends(get_db)):
+    poem = db.query(models.Poem).filter(models.Poem.id == poem_id).first()
+    if not poem:
+        raise HTTPException(status_code=404, detail="Poem not found")
+    
+    poem.likes_count += 1
+    db.commit()
+    db.refresh(poem)
+    return poem
+
 @app.post("/poems", response_model=schemas.PoemResponse, status_code=status.HTTP_201_CREATED)
 def create_poem(
     poem: schemas.PoemCreate, 
@@ -144,3 +166,48 @@ def create_poem(
     db.commit()
     db.refresh(db_poem)
     return db_poem
+
+# --- UPDATE POEM ---
+@app.put("/poems/{poem_id}", response_model=schemas.PoemResponse)
+def update_poem(
+    poem_id: int,
+    poem_in: schemas.PoemCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_user)
+):
+    db_poem = db.query(models.Poem).filter(models.Poem.id == poem_id).first()
+    if not db_poem:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Poem not found")
+    
+    if db_poem.author_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to edit this poem")
+
+    db_poem.title = poem_in.title
+    db_poem.content = poem_in.content
+    db_poem.excerpt = poem_in.excerpt
+    db_poem.status = poem_in.status
+    db_poem.mood = poem_in.mood
+    db_poem.tags = poem_in.tags
+
+    db.commit()
+    db.refresh(db_poem)
+    return db_poem
+
+
+# --- DELETE POEM ---
+@app.delete("/poems/{poem_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_poem(
+    poem_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_user)
+):
+    db_poem = db.query(models.Poem).filter(models.Poem.id == poem_id).first()
+    if not db_poem:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Poem not found")
+
+    if db_poem.author_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this poem")
+
+    db.delete(db_poem)
+    db.commit()
+    return None
